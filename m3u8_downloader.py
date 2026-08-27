@@ -146,7 +146,7 @@ def process_playlist(master_url: str, referer: str) -> tuple[str, list[tuple[str
 def main():
     parser = argparse.ArgumentParser(description="M3U8 Steganographic Downloader and Clipper CLI")
     parser.add_argument("-i", "--input", help="Path to input text file. If omitted, reads from stdin.")
-    parser.add_argument("-o", "--output-dir", default=".", help="Directory to save the output MP4 files.")
+    parser.add_argument("-o", "--output-dir", default="download", help="Directory to save the output MP4 files.")
     parser.add_argument("--transcode", action="store_true", help="Force transcoding instead of fast stream copying.")
     parser.add_argument("-j", "--parallel", type=int, default=8, help="Number of concurrent segment downloads.")
     

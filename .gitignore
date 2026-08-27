@@ -4,3 +4,4 @@ __pycache__/
 *.ts
 *.mp4
 temp_*
+download/
