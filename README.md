@@ -40,16 +40,16 @@ The tool accepts a structured text block from standard input (`stdin`) or an inp
 
 Example input:
 ```text
-https://supjav.com/zh/452901.html
-https://cdn4.turboviplay.com/data3/6a8d6e45b0b5f/6a8d6e45b0b5f.m3u8
-ABW-204
+https://example-referrer.com/page.html
+https://example-cdn.com/stream/playlist.m3u8
+example-video
     08:00-12:00
     44:00-53:00
     2:18:00
 ```
 *   **Line 1:** Referer URL (sent as standard page request headers).
 *   **Line 2:** Master M3U8 Playlist URL.
-*   **Line 3:** Filename prefix/code (e.g., `ABW-204`).
+*   **Line 3:** Filename prefix/code (e.g., `example-video`).
 *   **Line 4+:** Timestamp ranges or single start timestamps (which slice from the start point to the end of the video).
 
 ### CLI Command Options

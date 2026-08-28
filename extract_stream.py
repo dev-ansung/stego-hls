@@ -1,3 +1,4 @@
+import sys
 import subprocess
 import json
 import os
@@ -5,7 +6,7 @@ import re
 import urllib.parse
 import httpx
 
-applescript = """
+applescript_template = """
 tell application "Google Chrome"
 	set found to false
 	set winIdx to 1
@@ -15,7 +16,7 @@ tell application "Google Chrome"
 		set idx to 1
 		set tList to tabs of w
 		repeat with t in tList
-			if URL of t contains "sextb.net/mizd-420-rm" then
+			if URL of t contains "__SEARCH_KEYWORD__" then
 				set winIdx to id of w
 				set tabIdx to idx
 				set found to true
@@ -69,8 +70,19 @@ def get_mp4_duration(url: str) -> float:
 from m3u8_downloader import process_playlist, download_and_extract_segment
 
 def main():
-    print("Executing AppleScript to extract video source from Chrome tab...")
-    res = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
+    if len(sys.argv) > 1:
+        keyword = sys.argv[1].strip()
+    else:
+        print("Scrape active browser video player links directly from Chrome.")
+        keyword = input("Enter a keyword from the URL of the Chrome tab to search (e.g., example): ").strip()
+        
+    if not keyword:
+        print("No search keyword provided. Exiting.")
+        return
+        
+    print(f"Executing AppleScript to scan Chrome tabs for URL containing '{keyword}'...")
+    script = applescript_template.replace("__SEARCH_KEYWORD__", keyword)
+    res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
     
     url = None
     if "execution error" in res.stderr or "JavaScript through AppleScript is turned off" in res.stderr:
@@ -82,7 +94,7 @@ def main():
     else:
         output = res.stdout.strip()
         if "Tab not found" in output or not output:
-            print("[!] Could not find active 'sextb.net/mizd-420-rm' tab in Chrome.")
+            print(f"[!] Could not find active tab containing '{keyword}' in Chrome.")
             url = input("Please paste the copied streaming link manually: ").strip()
         else:
             urls = [line.strip() for line in output.split('\n') if line.strip()]
@@ -102,9 +114,11 @@ def main():
         return
 
     print(f"\nTarget URL to download: {url}")
-    referer = "https://supjav.com/"
+    referer = "https://example-referrer.com/"
     os.makedirs("download", exist_ok=True)
-    output_path = "download/mizd-420-rm_clip.mp4"
+    
+    safe_keyword = "".join(c if c.isalnum() else "_" for c in keyword)
+    output_path = f"download/clip_{safe_keyword}.mp4"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

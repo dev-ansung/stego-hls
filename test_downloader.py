@@ -26,17 +26,17 @@ class TestM3U8Downloader(unittest.TestCase):
 
     def test_parse_input_text(self):
         input_text = """
-        https://supjav.com/zh/452901.html
-        https://cdn4.turboviplay.com/data3/6a8d6e45b0b5f/6a8d6e45b0b5f.m3u8
-        ABW-204
+        https://example-referrer.com/page.html
+        https://example-cdn.com/stream/playlist.m3u8
+        example-video
             08:00-12:00
             2:18:00
         """
         referer, master_url, prefix, ranges = m3u8_downloader.parse_input_text(input_text)
         
-        self.assertEqual(referer, "https://supjav.com/zh/452901.html")
-        self.assertEqual(master_url, "https://cdn4.turboviplay.com/data3/6a8d6e45b0b5f/6a8d6e45b0b5f.m3u8")
-        self.assertEqual(prefix, "ABW-204")
+        self.assertEqual(referer, "https://example-referrer.com/page.html")
+        self.assertEqual(master_url, "https://example-cdn.com/stream/playlist.m3u8")
+        self.assertEqual(prefix, "example-video")
         
         self.assertEqual(len(ranges), 2)
         # Range 1: 08:00-12:00
