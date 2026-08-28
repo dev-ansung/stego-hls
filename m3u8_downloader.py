@@ -119,6 +119,21 @@ def process_playlist(master_url: str, referer: str) -> tuple[str, list[tuple[str
         resp.raise_for_status()
         master_content = resp.text
         
+        # Check if the content is HTML (usually iframe players containing the manifest link)
+        if master_content.strip().lower().startswith("<!doctype") or "<html" in master_content.lower():
+            embedded_urls = re.findall(r"['\"](https?://[^\'\"]+\.(?:m3u8|txt)[^\'\"]*)['\"]", master_content)
+            if not embedded_urls:
+                embedded_urls = re.findall(r"['\"]([^\'\"]+\.(?:m3u8|txt)[^\'\"]*)['\"]", master_content)
+                embedded_urls = [urllib.parse.urljoin(master_url, u) for u in embedded_urls]
+            
+            if embedded_urls:
+                master_url = embedded_urls[-1]
+                resp = client.get(master_url)
+                resp.raise_for_status()
+                master_content = resp.text
+            else:
+                raise ValueError("Could not find any HLS stream URLs embedded in the HTML page.")
+        
         # Parse stream playlists sequentially or by tags
         lines = [line.strip() for line in master_content.strip().split('\n') if line.strip()]
         sub_playlists = []
