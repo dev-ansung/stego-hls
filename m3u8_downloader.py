@@ -81,15 +81,17 @@ def find_ts_start_offset(segment_data: bytes) -> int:
             
     return -1
 
-def download_and_extract_segment(idx: int, url: str, client: httpx.Client) -> tuple[int, bytes]:
+def download_and_extract_segment(idx: int, url: str, client: httpx.Client, referer: str = None) -> tuple[int, bytes]:
     """
     Download segment, extract the TS payload, and return (idx, ts_bytes).
     """
-    headers = None
-    if "googleusercontent.com" in url:
-        headers = {"Referer": None, "Origin": None}
+    headers = {}
+    if referer and "googleusercontent.com" not in url:
+        headers["Referer"] = referer
+        parsed_ref = urllib.parse.urlparse(referer)
+        headers["Origin"] = f"{parsed_ref.scheme}://{parsed_ref.netloc}"
         
-    resp = client.get(url, headers=headers, timeout=30.0)
+    resp = client.get(url, headers=headers if headers else None, timeout=30.0)
     resp.raise_for_status()
     
     segment_data = resp.content
@@ -266,17 +268,13 @@ def main():
         download_headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        if referer:
-            download_headers["Referer"] = referer
-            parsed_ref = urllib.parse.urlparse(referer)
-            download_headers["Origin"] = f"{parsed_ref.scheme}://{parsed_ref.netloc}"
         
         segment_payloads = {}
         print("Downloading and extracting segments...")
         with httpx.Client(headers=download_headers, follow_redirects=True, timeout=60.0) as client:
             with ThreadPoolExecutor(max_workers=args.parallel) as executor:
                 futures = {
-                    executor.submit(download_and_extract_segment, seg["idx"], seg["url"], client): seg 
+                    executor.submit(download_and_extract_segment, seg["idx"], seg["url"], client, referer): seg 
                     for seg in overlapping_segs
                 }
                 
