@@ -1,6 +1,9 @@
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from stego_hls.cli import parse_input_text, parse_timestamp
+from stego_hls.cli import parse_timestamp, run_batch
 
 
 def test_parse_timestamp() -> None:
@@ -20,28 +23,53 @@ def test_parse_timestamp() -> None:
         parse_timestamp("abc")
 
 
-def test_parse_input_text() -> None:
-    input_text = """
-    https://example-referrer.com/page.html
-    https://example-cdn.com/stream/playlist.m3u8
-    example-video
-        08:00-12:00
-        2:18:00
-    """
-    referer, master_url, prefix, ranges = parse_input_text(input_text)
+@patch("stego_hls.cli.HlsClipper")
+def test_run_batch_single_task(mock_clipper_class: MagicMock) -> None:
+    # Arrange
+    mock_clipper = MagicMock()
+    mock_clipper_class.return_value = mock_clipper
     
-    assert referer == "https://example-referrer.com/page.html"
-    assert master_url == "https://example-cdn.com/stream/playlist.m3u8"
-    assert prefix == "example-video"
+    tasks = [
+        {
+            "url": "https://example-cdn.com/my-video.m3u8",
+            "referer": "https://example-referrer.com/page.html",
+            "output": "download/custom_clip.mp4",
+            "time": "08:00-12:00"
+        }
+    ]
+
+    # Act
+    run_batch(tasks, parallel=4, transcode=False)
+
+    # Assert
+    assert mock_clipper.clip.called is True
+    mock_clipper.clip.assert_called_once_with(
+        "https://example-cdn.com/my-video.m3u8",
+        start="480.0",
+        end="720.0",
+        output_path=Path("download/custom_clip.mp4"),
+        headers={
+            "Referer": "https://example-referrer.com/page.html",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+    )
+
+
+@patch("stego_hls.cli.HlsClipper")
+def test_run_batch_multiple_times(mock_clipper_class: MagicMock) -> None:
+    # Arrange
+    mock_clipper = MagicMock()
+    mock_clipper_class.return_value = mock_clipper
     
-    assert len(ranges) == 2
-    
-    # Range 1: 08:00-12:00
-    assert ranges[0][0] == 480.0
-    assert ranges[0][1] == 720.0
-    assert ranges[0][2] == "08:00-12:00"
-    
-    # Range 2: 2:18:00 (open range)
-    assert ranges[1][0] == 8280.0
-    assert ranges[1][1] is None
-    assert ranges[1][2] == "2:18:00"
+    tasks = [
+        {
+            "url": "https://example-cdn.com/my-video.m3u8",
+            "time": ["01:00-02:00", "05:00"]
+        }
+    ]
+
+    # Act
+    run_batch(tasks, parallel=4, transcode=False)
+
+    # Assert
+    assert mock_clipper.clip.call_count == 2
