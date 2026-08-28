@@ -1,9 +1,7 @@
-import sys
-import subprocess
-import json
 import os
-import re
-import urllib.parse
+import subprocess
+import sys
+
 import httpx
 
 applescript_template = """
@@ -67,7 +65,8 @@ def get_mp4_duration(url: str) -> float:
         return float(res.stdout.strip())
     raise ValueError(f"ffprobe failed: {res.stderr}")
 
-from m3u8_downloader import process_playlist, download_and_extract_segment
+from m3u8_downloader import download_and_extract_segment, process_playlist
+
 
 def main():
     if len(sys.argv) > 1:
@@ -183,7 +182,7 @@ def main():
             print("No overlapping segments found.")
             return
             
-        first_seg_idx = overlapping[0]["idx"]
+        overlapping[0]["idx"]
         first_seg_start = overlapping[0]["start"]
         rel_start = start - first_seg_start
         rel_end = end - first_seg_start
