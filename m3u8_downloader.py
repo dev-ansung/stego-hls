@@ -4,6 +4,7 @@ import sys
 import os
 import re
 import subprocess
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import httpx
 from tqdm import tqdm
@@ -84,7 +85,12 @@ def download_and_extract_segment(idx: int, url: str, client: httpx.Client) -> tu
     """
     Download segment, extract the TS payload, and return (idx, ts_bytes).
     """
-    resp = client.get(url, timeout=30.0)
+    headers = dict(client.headers)
+    if "googleusercontent.com" in url:
+        headers.pop("Referer", None)
+        headers.pop("Origin", None)
+        
+    resp = client.get(url, headers=headers, timeout=30.0)
     resp.raise_for_status()
     
     segment_data = resp.content
@@ -104,24 +110,40 @@ def process_playlist(master_url: str, referer: str) -> tuple[str, list[tuple[str
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": referer
     }
+    if referer:
+        parsed_ref = urllib.parse.urlparse(referer)
+        headers["Origin"] = f"{parsed_ref.scheme}://{parsed_ref.netloc}"
     
-    with httpx.Client(headers=headers, follow_redirects=True) as client:
+    with httpx.Client(headers=headers, follow_redirects=True, timeout=10.0) as client:
         # Fetch Master
         resp = client.get(master_url)
         resp.raise_for_status()
         master_content = resp.text
         
-        # Extract sub-playlists
-        sub_playlists = re.findall(r"https://[^\s]+/master.m3u8", master_content)
+        # Parse stream playlists sequentially or by tags
+        lines = [line.strip() for line in master_content.strip().split('\n') if line.strip()]
+        sub_playlists = []
+        for i, line in enumerate(lines):
+            if line.startswith("#EXT-X-STREAM-INF") and i + 1 < len(lines):
+                next_line = lines[i+1]
+                if not next_line.startswith("#"):
+                    sub_playlists.append(urllib.parse.urljoin(master_url, next_line))
+        
+        # Fallback if no sub-playlists found
         if not sub_playlists:
-            # Fallback if the URL passed is already the sub-playlist
-            if "master.m3u8" in master_url and "#EXTINF" in master_content:
+            if "#EXTINF" in master_content:
                 sub_url = master_url
                 sub_content = master_content
             else:
-                raise ValueError("No sub-playlists found in master playlist.")
-        else:
-            # Select highest quality (usually last)
+                for line in lines:
+                    if not line.startswith("#") and (".m3u8" in line or ".txt" in line or "playlist" in line):
+                        sub_playlists.append(urllib.parse.urljoin(master_url, line))
+                        
+                if not sub_playlists:
+                    raise ValueError("No sub-playlists found in master playlist.")
+                    
+        if sub_playlists:
+            # Select highest quality (usually last in master)
             sub_url = sub_playlists[-1]
             resp = client.get(sub_url)
             resp.raise_for_status()
@@ -138,8 +160,8 @@ def process_playlist(master_url: str, referer: str) -> tuple[str, list[tuple[str
                 dur_match = re.match(r"#EXTINF:([0-9.]+)", line)
                 if dur_match:
                     current_duration = float(dur_match.group(1))
-            elif line.startswith("http"):
-                segments.append((line, current_duration))
+            elif line and not line.startswith("#"):
+                segments.append((urllib.parse.urljoin(sub_url, line), current_duration))
                 
         return sub_url, segments
 
@@ -226,10 +248,14 @@ def main():
         print(f"Selected segments: {first_seg_idx} to {last_seg_idx} ({len(overlapping_segs)} segments total).")
         print(f"Relative cut points: {relative_start:.2f}s to {relative_end:.2f}s within the downloaded sequence.")
         
-        # Download segment payloads in parallel (omitting Referer to bypass CDN hotlinking filters)
+        # Download segment payloads in parallel
         download_headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
+        if referer:
+            download_headers["Referer"] = referer
+            parsed_ref = urllib.parse.urlparse(referer)
+            download_headers["Origin"] = f"{parsed_ref.scheme}://{parsed_ref.netloc}"
         
         segment_payloads = {}
         print("Downloading and extracting segments...")
