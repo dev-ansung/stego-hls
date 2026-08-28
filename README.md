@@ -15,6 +15,10 @@ A high-performance, steganography-aware HLS/M3U8 downloader and clipper. `stego-
 
 ## Installation
 
+### Prerequisites
+*   Python 3.12+ (modern Python standards)
+*   `ffmpeg` installed on your system path.
+
 ### CLI Usage (with `uv`)
 No installation is required if you are running it inside this repository. Simply run via `uv`:
 ```bash
@@ -70,49 +74,19 @@ Use the high-level manager class to fetch and clip HLS ranges:
 from stego_hls import HlsClipper
 
 # Instantiate the clipper
-clipper = HlsClipper(
-    master_url="https://cdn4.turboviplay.com/.../index.m3u8",
-    referer="https://supjav.com/"
-)
+clipper = HlsClipper()
 
 # Extract a range losslessly
 clipper.clip(
+    "https://cdn4.turboviplay.com/.../index.m3u8",
     start="08:00",
     end="12:00",
     output_path="download/clip_1.mp4",
-    parallel_workers=8
+    headers={"Referer": "https://supjav.com/"}
 )
-```
-
-### Custom Decoder Registration
-Inject a custom decryption class to handle proprietary obfuscations or XOR keys:
-```python
-from stego_hls import HlsClipper, BaseDecoder
-
-class CustomXorDecoder(BaseDecoder):
-    def __init__(self, key: int):
-        self.key = key
-
-    def decode(self, segment_data: bytes) -> bytes:
-        # Strip header bytes and XOR payload
-        payload = segment_data[128:]
-        return bytes(b ^ self.key for b in payload)
-
-# Register the decoder to the pipeline
-clipper = HlsClipper(master_url="...")
-clipper.register_decoder(CustomXorDecoder(key=0x5A))
-
-# Execute download
-clipper.clip(start="00:30", end="01:30", output_path="download/custom_clip.mp4")
 ```
 
 ---
 
-## How It Works (Extraction Algorithm)
-MPEG Transport Stream (TS) packets have a standard frame format of exactly **188 bytes** and always begin with the sync byte `0x47` (`G`).
-
-When decoding steganographic images, `stego-hls`:
-1.  Locates the PNG/JPEG chunk boundaries (`IEND` chunk for PNG).
-2.  Scans the subsequent payload for three consecutive sync bytes spaced by exactly 188 bytes:
-    $$ \text{data}[P] == 0x47 \quad\land\quad \text{data}[P + 188] == 0x47 \quad\land\quad \text{data}[P + 376] == 0x47 $$
-3.  Extracts the raw segment data starting from offset $P$ to the end of the buffer, leaving a clean, unencapsulated `.ts` stream.
+## Technical Documentation
+For class diagrams, low-level object-oriented specifications, sequence flows, and detailed steganographic algorithms, please refer to [TECHNICAL.md](TECHNICAL.md).
