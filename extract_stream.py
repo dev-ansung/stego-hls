@@ -178,17 +178,13 @@ def main():
         download_headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        if referer:
-            download_headers["Referer"] = referer
-            parsed_ref = urllib.parse.urlparse(referer)
-            download_headers["Origin"] = f"{parsed_ref.scheme}://{parsed_ref.netloc}"
         
         stego_success = True
         payloads = {}
         with httpx.Client(headers=download_headers, follow_redirects=True, timeout=60.0) as client:
             for seg in overlapping:
                 try:
-                    _, ts_bytes = download_and_extract_segment(seg["idx"], seg["url"], client)
+                    _, ts_bytes = download_and_extract_segment(seg["idx"], seg["url"], client, referer)
                     payloads[seg["idx"]] = ts_bytes
                 except Exception as e:
                     print(f"Stego extraction failed on segment: {e}")
