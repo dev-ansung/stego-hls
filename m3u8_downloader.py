@@ -85,10 +85,9 @@ def download_and_extract_segment(idx: int, url: str, client: httpx.Client) -> tu
     """
     Download segment, extract the TS payload, and return (idx, ts_bytes).
     """
-    headers = dict(client.headers)
+    headers = None
     if "googleusercontent.com" in url:
-        headers.pop("Referer", None)
-        headers.pop("Origin", None)
+        headers = {"Referer": None, "Origin": None}
         
     resp = client.get(url, headers=headers, timeout=30.0)
     resp.raise_for_status()
