@@ -19,15 +19,16 @@ A high-performance, steganography-aware HLS/M3U8 downloader and clipper. `stego-
 *   Python 3.12+ (modern Python standards)
 *   `ffmpeg` installed on your system path.
 
-### CLI Usage (with `uv`)
-No installation is required if you are running it inside this repository. Simply run via `uv`:
+### Zero-Install Remote Execution (via `uvx`)
+You can run this CLI tool directly from the repository without cloning or manual installation:
 ```bash
-uv run python3 m3u8_downloader.py -i input.txt
+uvx --from git+https://github.com/dev-ansung/m3u8-downloader.git m3u8-downloader -i input.txt
 ```
 
-### Library Installation (Planned)
+### Local Development Usage (via `uv`)
+If you have cloned the repository locally, run the executable script directly:
 ```bash
-pip install stego-hls
+uv run m3u8_downloader.py -i input.txt
 ```
 
 ---
