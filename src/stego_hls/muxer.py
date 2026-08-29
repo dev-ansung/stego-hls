@@ -28,10 +28,12 @@ class FfmpegMuxer(Muxer):
         """Pipes TS payload bytes directly into FFmpeg's stdin to output an MP4."""
         cmd = [
             "ffmpeg", "-y", 
-            "-i", "pipe:0",
-            "-ss", f"{relative_start:.3f}", 
-            "-to", f"{relative_end:.3f}"
+            "-i", "pipe:0"
         ]
+        if relative_start > 0.0:
+            cmd.extend(["-ss", f"{relative_start:.3f}", "-to", f"{relative_end:.3f}"])
+        else:
+            cmd.extend(["-t", f"{relative_end:.3f}"])
         
         if self.transcode:
             cmd.extend(["-c:v", "libx264", "-c:a", "aac"])
