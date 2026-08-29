@@ -69,6 +69,8 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool) -> None:
         # Setup standard request headers
         headers = {}
         if referer:
+            if not referer.startswith(("http://", "https://")):
+                referer = f"https://{referer}"
             headers["Referer"] = referer
             
         headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

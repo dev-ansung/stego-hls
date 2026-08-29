@@ -28,9 +28,9 @@ class FfmpegMuxer(Muxer):
         """Pipes TS payload bytes directly into FFmpeg's stdin to output an MP4."""
         cmd = [
             "ffmpeg", "-y", 
+            "-i", "pipe:0",
             "-ss", f"{relative_start:.3f}", 
-            "-to", f"{relative_end:.3f}", 
-            "-i", "pipe:0"
+            "-to", f"{relative_end:.3f}"
         ]
         
         if self.transcode:
@@ -45,7 +45,13 @@ class FfmpegMuxer(Muxer):
                 for index in sorted(payloads.keys()):
                     process.stdin.write(payloads[index])
                 process.stdin.close()
-                process.wait()
+                rc = process.wait()
+            except (BrokenPipeError, ConnectionResetError):
+                rc = process.wait()
             except Exception as e:  # noqa: BLE001
                 process.kill()
                 raise RuntimeError(f"FFmpeg stream remuxing failed: {e}")
+                
+            if rc != 0:
+                stderr_data = process.stderr.read().decode()
+                raise RuntimeError(f"FFmpeg stream remuxing failed (exit {rc}): {stderr_data}")
