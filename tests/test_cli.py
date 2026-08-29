@@ -27,6 +27,7 @@ def test_parse_timestamp() -> None:
 def test_run_batch_single_task(mock_clipper_class: MagicMock) -> None:
     # Arrange
     mock_clipper = MagicMock()
+    mock_clipper.clip.return_value = (480.0, 720.0)
     mock_clipper_class.return_value = mock_clipper
     
     tasks = [
@@ -59,6 +60,7 @@ def test_run_batch_single_task(mock_clipper_class: MagicMock) -> None:
 def test_run_batch_multiple_times(mock_clipper_class: MagicMock) -> None:
     # Arrange
     mock_clipper = MagicMock()
+    mock_clipper.clip.return_value = (60.0, 120.0)
     mock_clipper_class.return_value = mock_clipper
     
     tasks = [
@@ -73,3 +75,30 @@ def test_run_batch_multiple_times(mock_clipper_class: MagicMock) -> None:
 
     # Assert
     assert mock_clipper.clip.call_count == 2
+
+
+@patch("stego_hls.cli.HlsClipper")
+@patch("pathlib.Path.exists")
+@patch("pathlib.Path.rename")
+@patch("pathlib.Path.unlink")
+def test_run_batch_renaming_on_adjust(mock_unlink: MagicMock, mock_rename: MagicMock, mock_exists: MagicMock, mock_clipper_class: MagicMock) -> None:
+    # Arrange
+    mock_clipper = MagicMock()
+    mock_clipper.clip.return_value = (470.0, 720.0)
+    mock_clipper_class.return_value = mock_clipper
+    
+    mock_exists.return_value = True
+
+    tasks = [
+        {
+            "url": "https://example-cdn.com/my-video.m3u8",
+            "output": "download/custom_clip",
+            "time": "08:00-12:00"
+        }
+    ]
+
+    # Act
+    run_batch(tasks, parallel=4, transcode=False)
+
+    # Assert
+    mock_rename.assert_called_once_with(Path("download/custom_clip.07_50-12_00.mp4"))

@@ -100,6 +100,22 @@ class HlsClipper:
             output_path=str(output_path)
         )
 
+        actual_start_sec = first_seg_start + relative_start
+        actual_end_sec = min(end_sec, timeline.total_duration)
+
+        if not is_transcoding and start_sec != first_seg_start:
+            print(f"[stego-hls] Aligning start time from {self._format_duration(start_sec)} to {self._format_duration(first_seg_start)} (segment boundary keyframe) to prevent frozen frames in copy mode. Use --transcode for exact frame-level cuts.")
+
+        return actual_start_sec, actual_end_sec
+
+    def _format_duration(self, seconds: float) -> str:
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        if h > 0:
+            return f"{h:02d}:{m:02d}:{s:02d}"
+        return f"{m:02d}:{s:02d}"
+
     def _parse_time(self, time_str: str, /) -> float:
         parts = time_str.strip().split(':')
         match parts:

@@ -23,6 +23,15 @@ def parse_timestamp(t_str: str) -> float:
         case _:
             raise ValueError(f"Invalid timestamp format: {t_str}")
 
+def format_time(seconds: float) -> str:
+    """Formats float seconds to HH:MM:SS or MM:SS format with colons replaced by underscores."""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    if h > 0:
+        return f"{h:02d}_{m:02d}_{s:02d}"
+    return f"{m:02d}_{s:02d}"
+
 
 def run_batch(tasks: list[dict], *, parallel: int, transcode: bool) -> None:
     """Processes a batch array of clipping task configurations."""
@@ -97,13 +106,36 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool) -> None:
             end_str = str(end_time) if end_time is not None else "99999999.0"
             
             try:
-                clipper.clip(
+                actual_start, actual_end = clipper.clip(
                     url,
                     start=start_str,
                     end=end_str,
                     output_path=output_path,
                     headers=headers
                 )
+                
+                # If copy mode adjusted the start time, rename the file to avoid misleading names
+                is_explicit_single = output_prefix.endswith(".mp4") and len(ranges) == 1
+                if not is_explicit_single and not transcode and actual_start != start_time:
+                    if '-' in raw_range_str:
+                        actual_range_str = f"{format_time(actual_start)}-{format_time(actual_end) if end_time is not None else 'end'}"
+                    else:
+                        actual_range_str = format_time(actual_start)
+                        
+                    sanitized_actual = actual_range_str.replace(":", "_").replace("-", "-")
+                    
+                    if output_prefix.endswith(".mp4"):
+                        prefix_no_ext = output_prefix[:-4]
+                        new_path = Path(f"{prefix_no_ext}.{sanitized_actual}.mp4")
+                    else:
+                        new_path = Path(f"{output_prefix}.{sanitized_actual}.mp4")
+                        
+                    if output_path.exists() and output_path != new_path:
+                        if new_path.exists():
+                            new_path.unlink()
+                        output_path.rename(new_path)
+                        output_path = new_path
+                
                 print(f"Successfully generated: {output_path}")
             except Exception as e:  # noqa: BLE001
                 print(f"Failed to clip {raw_range_str}: {e}", file=sys.stderr)
