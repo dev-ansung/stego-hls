@@ -1,3 +1,4 @@
+import hashlib
 import os
 import re
 import urllib.parse
@@ -5,6 +6,7 @@ from pathlib import Path
 
 import httpx
 
+from stego_hls.cache import FileSegmentCache, SegmentCache
 from stego_hls.decoders import BaseDecoder, StegoDecoder
 from stego_hls.downloader import ParallelDownloader
 from stego_hls.muxer import FfmpegMuxer, Muxer
@@ -18,8 +20,10 @@ class HlsClipper:
                  *, 
                  downloader: ParallelDownloader | None = None,
                  decoder: BaseDecoder | None = None,
-                 muxer: Muxer | None = None) -> None:
-        self.downloader = downloader or ParallelDownloader()
+                 muxer: Muxer | None = None,
+                 cache: SegmentCache | None = None) -> None:
+        self.cache = cache if cache is not None else FileSegmentCache()
+        self.downloader = downloader or ParallelDownloader(cache=self.cache)
         self.decoder = decoder or StegoDecoder()
         self.muxer = muxer or FfmpegMuxer()
 
@@ -31,13 +35,15 @@ class HlsClipper:
              output_prefix: str | Path,
              headers: dict[str, str] | None = None,
              align_bounds: bool = True,
-             srt_path: str | Path | None = None) -> Path:
+             srt_path: str | Path | None = None,
+             keep_cache: bool = False) -> Path:
         """Coordinates parsing, timeline slicing, parallel fetching, decoding, and muxing.
         
         Returns:
             Path: The final resolved output video file path.
         """
         request_headers = headers or {}
+        stream_hash = hashlib.sha256(master_url.encode("utf-8")).hexdigest()[:16]
         
         # 1. Fetch master playlist raw text (Single-Request)
         with httpx.Client(headers=request_headers, follow_redirects=True) as client:
@@ -97,8 +103,8 @@ class HlsClipper:
         if requires_alignment and align_bounds and start_sec != first_seg_start:
             print(f"[stego-hls] Aligning start time from {self._format_duration(start_sec)} to {self._format_duration(first_seg_start)} (segment boundary keyframe) to prevent frozen frames in copy mode. Use --transcode for exact frame-level cuts.")
 
-        # 5. Download segment buffers
-        raw_payloads = self.downloader.download(overlapping, request_headers)
+        # 5. Download segment buffers (utilising cache and retry loops)
+        raw_payloads = self.downloader.download(overlapping, request_headers, stream_hash)
 
         # 6. Decode segments in memory
         decoded_payloads: DecodedPayloads = {
@@ -108,17 +114,18 @@ class HlsClipper:
 
         # Subtitle Shift Processing
         temp_srt_path: Path | None = None
-        if srt_path:
-            from stego_hls.subtitles import shift_srt_content
-            with open(srt_path, "r", encoding="utf-8", errors="ignore") as f:
-                srt_content = f.read()
-            shifted_content = shift_srt_content(srt_content, actual_start_sec, actual_end_sec)
-            temp_srt_path = output_path.with_suffix(".tmp.srt")
-            with open(temp_srt_path, "w", encoding="utf-8") as f:
-                f.write(shifted_content)
-
-        # 7. Stream directly into Muxer stdin
+        success = False
         try:
+            if srt_path:
+                from stego_hls.subtitles import shift_srt_content
+                with open(srt_path, "r", encoding="utf-8", errors="ignore") as f:
+                    srt_content = f.read()
+                shifted_content = shift_srt_content(srt_content, actual_start_sec, actual_end_sec)
+                temp_srt_path = output_path.with_suffix(".tmp.srt")
+                with open(temp_srt_path, "w", encoding="utf-8") as f:
+                    f.write(shifted_content)
+
+            # 7. Stream directly into Muxer stdin
             self.muxer.concatenate_and_clip(
                 decoded_payloads, 
                 relative_start=relative_start, 
@@ -126,12 +133,15 @@ class HlsClipper:
                 output_path=str(output_path),
                 srt_path=str(temp_srt_path) if temp_srt_path else None
             )
+            success = True
         finally:
             if temp_srt_path and temp_srt_path.exists():
                 try:
                     temp_srt_path.unlink()
                 except OSError:
                     pass
+            if success and not keep_cache:
+                self.cache.clear(stream_hash)
         
         return output_path
 
