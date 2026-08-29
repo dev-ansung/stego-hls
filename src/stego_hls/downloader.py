@@ -73,22 +73,44 @@ class ParallelDownloader:
         # Import tqdm here to keep standard library fast
         from tqdm import tqdm
 
+        def format_speed(bps: float) -> str:
+            if bps >= 1024 * 1024:
+                return f"{bps / (1024 * 1024):.2f} MB/s"
+            elif bps >= 1024:
+                return f"{bps / 1024:.2f} KB/s"
+            return f"{bps:.2f} B/s"
+
         with ThreadPoolExecutor(max_workers=self.workers) as executor:
             futures = {executor.submit(fetch_segment, seg): seg for seg in segments}
             
-            iterable = as_completed(futures)
+            tqdm_bar = None
             if progress_cb is None:
-                iterable = tqdm(
-                    iterable,
+                tqdm_bar = tqdm(
                     total=len(segments),
                     desc="Downloading segments",
                     unit="seg"
                 )
                 
-            for future in iterable:
-                idx, data = future.result()
-                raw_payloads[idx] = data
-                if progress_cb:
-                    progress_cb(len(raw_payloads), len(segments))
+            total_bytes = 0
+            start_time = time.time()
+            
+            try:
+                for future in as_completed(futures):
+                    idx, data = future.result()
+                    raw_payloads[idx] = data
+                    total_bytes += len(data)
+                    
+                    elapsed = time.time() - start_time
+                    bytes_per_sec = total_bytes / elapsed if elapsed > 0 else 0.0
+                    
+                    if tqdm_bar:
+                        tqdm_bar.set_postfix_str(format_speed(bytes_per_sec))
+                        tqdm_bar.update(1)
+                        
+                    if progress_cb:
+                        progress_cb(len(raw_payloads), len(segments))
+            finally:
+                if tqdm_bar:
+                    tqdm_bar.close()
 
         return raw_payloads
