@@ -36,10 +36,21 @@ class ParallelDownloader:
 
         # Import inside function to avoid circular references if any
         import urllib.parse
+        from tqdm import tqdm
 
         with ThreadPoolExecutor(max_workers=self.workers) as executor:
             futures = {executor.submit(fetch_segment, seg): seg for seg in segments}
-            for future in as_completed(futures):
+            
+            iterable = as_completed(futures)
+            if progress_cb is None:
+                iterable = tqdm(
+                    iterable,
+                    total=len(segments),
+                    desc="Downloading segments",
+                    unit="seg"
+                )
+                
+            for future in iterable:
                 idx, data = future.result()
                 raw_payloads[idx] = data
                 if progress_cb:
