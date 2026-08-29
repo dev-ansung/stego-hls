@@ -33,7 +33,7 @@ def format_time(seconds: float) -> str:
     return f"{m:02d}_{s:02d}"
 
 
-def run_batch(tasks: list[dict], *, parallel: int, transcode: bool) -> None:
+def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bool = False) -> None:
     """Processes a batch array of clipping task configurations."""
     downloader = ParallelDownloader(workers=parallel)
     muxer = FfmpegMuxer(transcode=transcode)
@@ -48,6 +48,7 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool) -> None:
         referer = task.get("referer")
         output = task.get("output")
         time_spec = task.get("time")
+        no_align_task = task.get("no_align", no_align)
         
         # Resolve output destination prefix
         if not output:
@@ -111,7 +112,8 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool) -> None:
                     start=start_str,
                     end=end_str,
                     output_path=output_path,
-                    headers=headers
+                    headers=headers,
+                    align_bounds=not no_align_task
                 )
                 
                 # If copy mode adjusted the start time, rename the file to avoid misleading names
@@ -149,6 +151,7 @@ def main() -> None:
     parser.add_argument("-o", "--output", help="Destination file path or prefix.")
     parser.add_argument("-b", "--batch", help="Path to a JSON batch task file (or '-' to read JSON from stdin).")
     parser.add_argument("--transcode", action="store_true", help="Force transcoding instead of fast stream copying.")
+    parser.add_argument("--no-align", action="store_true", help="Disable segment boundary alignment in copy mode (might cause frozen start frames).")
     parser.add_argument("-j", "--parallel", type=int, default=8, help="Number of concurrent segment downloads.")
     
     args = parser.parse_args()
@@ -171,7 +174,7 @@ def main() -> None:
             print("Batch JSON must be a list of task configurations.", file=sys.stderr)
             sys.exit(1)
             
-        run_batch(tasks, parallel=args.parallel, transcode=args.transcode)
+        run_batch(tasks, parallel=args.parallel, transcode=args.transcode, no_align=args.no_align)
         return
         
     # Direct single-line argument parsing
@@ -186,7 +189,7 @@ def main() -> None:
         "time": args.time
     }
     
-    run_batch([task], parallel=args.parallel, transcode=args.transcode)
+    run_batch([task], parallel=args.parallel, transcode=args.transcode, no_align=args.no_align)
 
 
 if __name__ == "__main__":

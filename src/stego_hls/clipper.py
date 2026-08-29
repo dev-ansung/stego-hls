@@ -27,7 +27,8 @@ class HlsClipper:
              start: str, 
              end: str, 
              output_path: str | Path,
-             headers: dict[str, str] | None = None) -> None:
+             headers: dict[str, str] | None = None,
+             align_bounds: bool = True) -> tuple[float, float]:
         """Coordinates parsing, timeline slicing, parallel fetching, decoding, and muxing."""
         request_headers = headers or {}
         
@@ -43,25 +44,15 @@ class HlsClipper:
                 if not embedded_urls:
                     embedded_urls = re.findall(r"['\"]([^\'\"]+\.(?:m3u8|txt)[^\'\"]*)['\"]", master_text)
                     embedded_urls = [urllib.parse.urljoin(master_url, u) for u in embedded_urls]
-                
-                if embedded_urls:
-                    master_url = embedded_urls[-1]
-                    resp = client.get(master_url)
-                    resp.raise_for_status()
-                    master_text = resp.text
-                else:
-                    raise ValueError("Could not find any HLS stream URLs embedded in the HTML page.")
-
-            # 2. Resolve sub-playlist (if master is a multi-variant manifest)
-            sub_url = PlaylistParser.resolve_sub_playlist(master_text, master_url=master_url)
-            if sub_url != master_url:
-                resp = client.get(sub_url)
-                resp.raise_for_status()
-                sub_text = resp.text
+                if not embedded_urls:
+                    raise ValueError("No M3U8 streaming URLs found in player iframe HTML.")
+                sub_url = embedded_urls[0]
             else:
-                sub_text = master_text
+                sub_url = PlaylistParser.resolve_sub_playlist(master_text, master_url=master_url)
+                
+            sub_text = client.get(sub_url).text
 
-        # 3. Parse manifest
+        # 2. Parse sub-playlist timeline
         timeline = PlaylistParser.parse_manifest(sub_text, base_url=sub_url)
 
         # 4. Time bounds mapping
@@ -76,10 +67,10 @@ class HlsClipper:
         
         # In copy mode, align start to the segment boundary keyframe to prevent frozen frames
         is_transcoding = getattr(self.muxer, "transcode", False)
-        if is_transcoding:
-            relative_start = start_sec - first_seg_start
-        else:
+        if not is_transcoding and align_bounds:
             relative_start = 0.0
+        else:
+            relative_start = start_sec - first_seg_start
             
         relative_end = end_sec - first_seg_start
 

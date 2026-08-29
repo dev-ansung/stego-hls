@@ -120,3 +120,46 @@ def test_clipper_pipeline_execution_transcode(mock_client_class: MagicMock) -> N
 
     # Transcode mode: exact start offset (2.0)
     assert mock_muxer.relative_start == 2.0
+
+
+@patch("httpx.Client")
+def test_clipper_pipeline_execution_no_align(mock_client_class: MagicMock) -> None:
+    mock_client = MagicMock()
+    mock_client_class.return_value.__enter__.return_value = mock_client
+    
+    mock_response = MagicMock()
+    mock_response.text = """
+#EXTM3U
+#EXT-X-VERSION:3
+#EXTINF:5.000,
+0.ts
+#EXTINF:5.000,
+1.ts
+    """
+    mock_client.get.return_value = mock_response
+
+    mock_downloader = MagicMock()
+    mock_downloader.download.return_value = {
+        0: b"segment_0_raw",
+        1: b"segment_1_raw"
+    }
+    
+    mock_muxer = MockMuxer(transcode=False)
+    mock_decoder = MockDecoder()
+
+    clipper = HlsClipper(
+        downloader=mock_downloader,
+        decoder=mock_decoder,
+        muxer=mock_muxer
+    )
+    
+    clipper.clip(
+        "https://example.com/master.m3u8",
+        start="2.0",
+        end="8.0",
+        output_path="download/out.mp4",
+        align_bounds=False
+    )
+
+    # Copy mode with align_bounds=False: exact start offset (2.0)
+    assert mock_muxer.relative_start == 2.0

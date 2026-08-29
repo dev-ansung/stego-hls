@@ -43,6 +43,7 @@ uv run m3u8_downloader.py <URL> [OPTIONS]
 *   `-b, --batch <FILE>`: Path to a JSON batch task file (or `-` to read JSON from stdin).
 *   `-j, --parallel <INT>`: Concurrent downloader workers (default: 8).
 *   `--transcode`: Force transcoding instead of fast sub-second stream copying.
+*   `--no-align`: Disable segment boundary keyframe alignment in copy mode (might cause frozen start frames).
 
 ### Direct Examples
 1. Download a single clip:
