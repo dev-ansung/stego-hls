@@ -45,6 +45,7 @@ uv run m3u8_downloader.py <URL> [OPTIONS]
 *   `--transcode`: Force transcoding instead of fast sub-second stream copying.
 *   `--no-align`: Disable segment boundary keyframe alignment in copy mode (might cause frozen start frames).
 *   `--srt <FILE>`: Optional path to a `.srt` subtitle file. Timings will be automatically shifted/clipped. Embeds soft subtitles by default, or burns them in if `--transcode` is specified.
+*   `--keep-cache`: Retain downloaded segment cache folder (`.stego_cache/<hash>/`) on successful completion (by default, it is cleared to save disk space).
 
 ### Direct Examples
 1. Download a single clip:
