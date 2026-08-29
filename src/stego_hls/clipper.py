@@ -30,7 +30,8 @@ class HlsClipper:
              end: str, 
              output_prefix: str | Path,
              headers: dict[str, str] | None = None,
-             align_bounds: bool = True) -> Path:
+             align_bounds: bool = True,
+             srt_path: str | Path | None = None) -> Path:
         """Coordinates parsing, timeline slicing, parallel fetching, decoding, and muxing.
         
         Returns:
@@ -105,13 +106,32 @@ class HlsClipper:
             for index, raw_data in raw_payloads.items()
         }
 
+        # Subtitle Shift Processing
+        temp_srt_path: Path | None = None
+        if srt_path:
+            from stego_hls.subtitles import shift_srt_content
+            with open(srt_path, "r", encoding="utf-8", errors="ignore") as f:
+                srt_content = f.read()
+            shifted_content = shift_srt_content(srt_content, actual_start_sec, actual_end_sec)
+            temp_srt_path = output_path.with_suffix(".tmp.srt")
+            with open(temp_srt_path, "w", encoding="utf-8") as f:
+                f.write(shifted_content)
+
         # 7. Stream directly into Muxer stdin
-        self.muxer.concatenate_and_clip(
-            decoded_payloads, 
-            relative_start=relative_start, 
-            relative_end=relative_end, 
-            output_path=str(output_path)
-        )
+        try:
+            self.muxer.concatenate_and_clip(
+                decoded_payloads, 
+                relative_start=relative_start, 
+                relative_end=relative_end, 
+                output_path=str(output_path),
+                srt_path=str(temp_srt_path) if temp_srt_path else None
+            )
+        finally:
+            if temp_srt_path and temp_srt_path.exists():
+                try:
+                    temp_srt_path.unlink()
+                except OSError:
+                    pass
         
         return output_path
 

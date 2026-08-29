@@ -36,6 +36,7 @@ class ParallelDownloader:
 
         # Import inside function to avoid circular references if any
         import urllib.parse
+
         from tqdm import tqdm
 
         with ThreadPoolExecutor(max_workers=self.workers) as executor:

@@ -15,7 +15,8 @@ class Muxer(Protocol):
                              *, 
                              relative_start: float, 
                              relative_end: float, 
-                             output_path: str) -> None:
+                             output_path: str,
+                             srt_path: str | None = None) -> None:
         """Concatenates the payloads and trims them to output_path."""
         ...
 
@@ -33,21 +34,30 @@ class FfmpegMuxer(Muxer):
                              *, 
                              relative_start: float, 
                              relative_end: float, 
-                             output_path: str) -> None:
+                             output_path: str,
+                             srt_path: str | None = None) -> None:
         """Pipes TS payload bytes directly into FFmpeg's stdin to output an MP4."""
         cmd = [
             "ffmpeg", "-y", 
             "-i", "pipe:0"
         ]
+        if srt_path:
+            cmd.extend(["-i", srt_path])
+
         if relative_start > 0.0:
             cmd.extend(["-ss", f"{relative_start:.3f}", "-to", f"{relative_end:.3f}"])
         else:
             cmd.extend(["-t", f"{relative_end:.3f}"])
         
         if self.transcode:
+            if srt_path:
+                escaped_srt = srt_path.replace("\\", "/").replace("'", "'\\''").replace(":", "\\:")
+                cmd.extend(["-vf", f"subtitles='{escaped_srt}'"])
             cmd.extend(["-c:v", "libx264", "-c:a", "aac"])
         else:
             cmd.extend(["-c", "copy"])
+            if srt_path:
+                cmd.extend(["-c:s", "mov_text", "-map", "0", "-map", "1"])
             
         cmd.append(output_path)
         

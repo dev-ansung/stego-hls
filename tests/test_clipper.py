@@ -24,11 +24,13 @@ class MockMuxer:
                              *, 
                              relative_start: float, 
                              relative_end: float, 
-                             output_path: str) -> None:
+                             output_path: str,
+                             srt_path: str | None = None) -> None:
         self.called = True
         self.payloads = payloads
         self.relative_start = relative_start
         self.relative_end = relative_end
+        self.srt_path = srt_path
 
 
 class MockDecoder(BaseDecoder):
@@ -195,3 +197,68 @@ def test_resolve_output_path() -> None:
     prefix = Path("download/my_prefix")
     resolved = clipper._resolve_output_path(prefix, start_sec=480.0, end_sec=99999999.0, end_original="99999999.0")
     assert resolved == Path("download/my_prefix.08_00.mp4")
+
+
+@patch("httpx.Client")
+def test_clipper_pipeline_execution_with_srt(mock_client_class: MagicMock, tmp_path: Path) -> None:
+    mock_client = MagicMock()
+    mock_client_class.return_value.__enter__.return_value = mock_client
+    
+    mock_response = MagicMock()
+    mock_response.text = """
+#EXTM3U
+#EXT-X-VERSION:3
+#EXTINF:5.000,
+0.ts
+#EXTINF:5.000,
+1.ts
+    """
+    mock_client.get.return_value = mock_response
+
+    mock_downloader = MagicMock()
+    mock_downloader.download.return_value = {
+        0: b"segment_0_raw",
+        1: b"segment_1_raw"
+    }
+    
+    mock_muxer = MockMuxer(transcode=False)
+    mock_decoder = MockDecoder()
+
+    clipper = HlsClipper(
+        downloader=mock_downloader,
+        decoder=mock_decoder,
+        muxer=mock_muxer
+    )
+    
+    # Write a test SRT file
+    test_srt = tmp_path / "test.srt"
+    test_srt.write_text("""1
+00:00:02,000 --> 00:00:05,000
+First sub
+
+2
+00:00:06,500 --> 00:00:10,000
+Second sub
+""", encoding="utf-8")
+
+    out_prefix = tmp_path / "out.mp4"
+
+    # We shift by 3s (from 3.0 to 8.0)
+    final_path = clipper.clip(
+        "https://example.com/master.m3u8",
+        start="3.0",
+        end="8.0",
+        output_prefix=out_prefix,
+        srt_path=test_srt,
+        align_bounds=False  # Keep start at exactly 3.0 (so shift is exactly 3.0s)
+    )
+
+    # Assertions
+    assert mock_muxer.called is True
+    assert mock_muxer.srt_path is not None
+    
+    temp_srt_path = Path(mock_muxer.srt_path)
+    
+    # The temporary shifted file should have been cleaned up by finally block
+    assert temp_srt_path.exists() is False
+    assert final_path == out_prefix

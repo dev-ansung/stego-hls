@@ -22,7 +22,7 @@ def parse_timestamp(t_str: str) -> float:
         case _:
             raise ValueError(f"Invalid timestamp format: {t_str}")
 
-def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bool = False) -> None:
+def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bool = False, srt: str | None = None) -> None:
     """Processes a batch array of clipping task configurations."""
     downloader = ParallelDownloader(workers=parallel)
     muxer = FfmpegMuxer(transcode=transcode)
@@ -38,6 +38,7 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bo
         output = task.get("output")
         time_spec = task.get("time")
         no_align_task = task.get("no_align", no_align)
+        srt_task = task.get("srt", srt)
         
         # Resolve output destination prefix
         if not output:
@@ -96,7 +97,8 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bo
                     end=end_str,
                     output_prefix=target_prefix,
                     headers=headers,
-                    align_bounds=not no_align_task
+                    align_bounds=not no_align_task,
+                    srt_path=srt_task
                 )
                 print(f"Successfully generated: {final_path}")
             except Exception as e:  # noqa: BLE001
@@ -112,6 +114,7 @@ def main() -> None:
     parser.add_argument("-b", "--batch", help="Path to a JSON batch task file (or '-' to read JSON from stdin).")
     parser.add_argument("--transcode", action="store_true", help="Force transcoding instead of fast stream copying.")
     parser.add_argument("--no-align", action="store_true", help="Disable segment boundary alignment in copy mode (might cause frozen start frames).")
+    parser.add_argument("--srt", help="Optional path to a .srt subtitle file to embed or burn in.")
     parser.add_argument("-j", "--parallel", type=int, default=8, help="Number of concurrent segment downloads.")
     
     args = parser.parse_args()
@@ -134,7 +137,7 @@ def main() -> None:
             print("Batch JSON must be a list of task configurations.", file=sys.stderr)
             sys.exit(1)
             
-        run_batch(tasks, parallel=args.parallel, transcode=args.transcode, no_align=args.no_align)
+        run_batch(tasks, parallel=args.parallel, transcode=args.transcode, no_align=args.no_align, srt=args.srt)
         return
         
     # Direct single-line argument parsing
@@ -146,10 +149,11 @@ def main() -> None:
         "url": args.url,
         "referer": args.referer,
         "output": args.output,
-        "time": args.time
+        "time": args.time,
+        "srt": args.srt
     }
     
-    run_batch([task], parallel=args.parallel, transcode=args.transcode, no_align=args.no_align)
+    run_batch([task], parallel=args.parallel, transcode=args.transcode, no_align=args.no_align, srt=args.srt)
 
 
 if __name__ == "__main__":
