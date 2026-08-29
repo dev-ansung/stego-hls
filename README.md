@@ -92,13 +92,17 @@ from stego_hls import HlsClipper
 clipper = HlsClipper()
 
 # Extract a range losslessly
-clipper.clip(
+# Extract a range losslessly, automatically shifting subtitle file
+final_path = clipper.clip(
     "https://cdn4.turboviplay.com/.../index.m3u8",
     start="08:00",
     end="12:00",
-    output_path="download/clip_1.mp4",
-    headers={"Referer": "https://supjav.com/"}
+    output_prefix="download/clip_1.mp4",
+    headers={"Referer": "https://supjav.com/"},
+    srt_path="english_subs.srt",
+    keep_cache=False
 )
+print(f"Video generated: {final_path}")
 ```
 
 ---
