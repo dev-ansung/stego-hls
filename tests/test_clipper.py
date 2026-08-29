@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from stego_hls.clipper import HlsClipper
@@ -13,6 +14,10 @@ class MockMuxer:
         self.relative_start = 0.0
         self.relative_end = 0.0
         self.payloads: DecodedPayloads = {}
+
+    @property
+    def requires_keyframe_alignment(self) -> bool:
+        return not self.transcode
 
     def concatenate_and_clip(self, 
                              payloads: DecodedPayloads, 
@@ -65,11 +70,11 @@ def test_clipper_pipeline_execution(mock_client_class: MagicMock) -> None:
         muxer=mock_muxer
     )
     
-    clipper.clip(
+    final_path = clipper.clip(
         "https://example.com/master.m3u8",
         start="2.0",
         end="8.0",
-        output_path="download/out.mp4"
+        output_prefix="download/out.mp4"
     )
 
     # Assertions
@@ -78,6 +83,7 @@ def test_clipper_pipeline_execution(mock_client_class: MagicMock) -> None:
     assert mock_muxer.relative_start == 0.0
     assert mock_muxer.relative_end == 8.0
     assert mock_muxer.payloads == {0: b"segment_0_raw", 1: b"segment_1_raw"}
+    assert final_path == Path("download/out.mp4")
 
 
 @patch("httpx.Client")
@@ -111,15 +117,16 @@ def test_clipper_pipeline_execution_transcode(mock_client_class: MagicMock) -> N
         muxer=mock_muxer
     )
     
-    clipper.clip(
+    final_path = clipper.clip(
         "https://example.com/master.m3u8",
         start="2.0",
         end="8.0",
-        output_path="download/out.mp4"
+        output_prefix="download/out.mp4"
     )
 
     # Transcode mode: exact start offset (2.0)
     assert mock_muxer.relative_start == 2.0
+    assert final_path == Path("download/out.mp4")
 
 
 @patch("httpx.Client")
@@ -153,13 +160,38 @@ def test_clipper_pipeline_execution_no_align(mock_client_class: MagicMock) -> No
         muxer=mock_muxer
     )
     
-    clipper.clip(
+    final_path = clipper.clip(
         "https://example.com/master.m3u8",
         start="2.0",
         end="8.0",
-        output_path="download/out.mp4",
+        output_prefix="download/out.mp4",
         align_bounds=False
     )
 
     # Copy mode with align_bounds=False: exact start offset (2.0)
     assert mock_muxer.relative_start == 2.0
+    assert final_path == Path("download/out.mp4")
+
+
+def test_resolve_output_path() -> None:
+    # Arrange
+    clipper = HlsClipper(
+        downloader=MagicMock(),
+        decoder=MagicMock(),
+        muxer=MagicMock()
+    )
+
+    # Case 1: Explicit .mp4 path
+    prefix = Path("download/my_video.mp4")
+    resolved = clipper._resolve_output_path(prefix, start_sec=3030.0, end_sec=3587.0, end_original="59:47")
+    assert resolved == Path("download/my_video.mp4")
+
+    # Case 2: Folder prefix with range
+    prefix = Path("download/my_prefix")
+    resolved = clipper._resolve_output_path(prefix, start_sec=480.0, end_sec=720.0, end_original="12:00")
+    assert resolved == Path("download/my_prefix.08_00-12_00.mp4")
+
+    # Case 3: Folder prefix with single timestamp
+    prefix = Path("download/my_prefix")
+    resolved = clipper._resolve_output_path(prefix, start_sec=480.0, end_sec=99999999.0, end_original="99999999.0")
+    assert resolved == Path("download/my_prefix.08_00.mp4")

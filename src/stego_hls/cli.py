@@ -3,7 +3,6 @@ import json
 import os
 import sys
 import urllib.parse
-from pathlib import Path
 
 from stego_hls.clipper import HlsClipper
 from stego_hls.downloader import ParallelDownloader
@@ -22,16 +21,6 @@ def parse_timestamp(t_str: str) -> float:
             return float(h) * 3600 + float(m) * 60 + float(s)
         case _:
             raise ValueError(f"Invalid timestamp format: {t_str}")
-
-def format_time(seconds: float) -> str:
-    """Formats float seconds to HH:MM:SS or MM:SS format with colons replaced by underscores."""
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = int(seconds % 60)
-    if h > 0:
-        return f"{h:02d}_{m:02d}_{s:02d}"
-    return f"{m:02d}_{s:02d}"
-
 
 def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bool = False) -> None:
     """Processes a batch array of clipping task configurations."""
@@ -86,59 +75,30 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bo
         headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
         for start_time, end_time, raw_range_str in ranges:
-            sanitized_range = raw_range_str.replace(":", "_").replace("-", "-")
-            
             if output_prefix.endswith(".mp4") and len(ranges) == 1:
-                output_path = Path(output_prefix)
+                target_prefix = output_prefix
             elif output_prefix.endswith(".mp4"):
-                prefix_no_ext = output_prefix[:-4]
-                output_path = Path(f"{prefix_no_ext}.{sanitized_range}.mp4")
+                target_prefix = output_prefix[:-4]
             else:
-                output_path = Path(f"{output_prefix}.{sanitized_range}.mp4")
+                target_prefix = output_prefix
                 
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
             print(f"\nProcessing: {url}")
             if referer:
                 print(f"Referer: {referer}")
-            print(f"Output to: {output_path}")
             
             start_str = str(start_time)
             end_str = str(end_time) if end_time is not None else "99999999.0"
             
             try:
-                actual_start, actual_end = clipper.clip(
+                final_path = clipper.clip(
                     url,
                     start=start_str,
                     end=end_str,
-                    output_path=output_path,
+                    output_prefix=target_prefix,
                     headers=headers,
                     align_bounds=not no_align_task
                 )
-                
-                # If copy mode adjusted the start time, rename the file to avoid misleading names
-                is_explicit_single = output_prefix.endswith(".mp4") and len(ranges) == 1
-                if not is_explicit_single and not transcode and actual_start != start_time:
-                    if '-' in raw_range_str:
-                        actual_range_str = f"{format_time(actual_start)}-{format_time(actual_end) if end_time is not None else 'end'}"
-                    else:
-                        actual_range_str = format_time(actual_start)
-                        
-                    sanitized_actual = actual_range_str.replace(":", "_").replace("-", "-")
-                    
-                    if output_prefix.endswith(".mp4"):
-                        prefix_no_ext = output_prefix[:-4]
-                        new_path = Path(f"{prefix_no_ext}.{sanitized_actual}.mp4")
-                    else:
-                        new_path = Path(f"{output_prefix}.{sanitized_actual}.mp4")
-                        
-                    if output_path.exists() and output_path != new_path:
-                        if new_path.exists():
-                            new_path.unlink()
-                        output_path.rename(new_path)
-                        output_path = new_path
-                
-                print(f"Successfully generated: {output_path}")
+                print(f"Successfully generated: {final_path}")
             except Exception as e:  # noqa: BLE001
                 print(f"Failed to clip {raw_range_str}: {e}", file=sys.stderr)
 

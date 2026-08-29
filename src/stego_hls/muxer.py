@@ -5,6 +5,11 @@ type DecodedPayloads = dict[int, bytes]
 
 
 class Muxer(Protocol):
+    @property
+    def requires_keyframe_alignment(self) -> bool:
+        """Indicates whether the muxing strategy requires keyframe boundary alignment to prevent frozen frames."""
+        ...
+
     def concatenate_and_clip(self, 
                              payloads: DecodedPayloads, 
                              *, 
@@ -18,6 +23,10 @@ class Muxer(Protocol):
 class FfmpegMuxer(Muxer):
     def __init__(self, *, transcode: bool = False) -> None:
         self.transcode = transcode
+
+    @property
+    def requires_keyframe_alignment(self) -> bool:
+        return not self.transcode
 
     def concatenate_and_clip(self, 
                              payloads: DecodedPayloads, 
