@@ -40,7 +40,7 @@ class FfmpegMuxer(Muxer):
             
         cmd.append(output_path)
         
-        with subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        with subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=None) as process:
             try:
                 for index in sorted(payloads.keys()):
                     process.stdin.write(payloads[index])
@@ -53,5 +53,4 @@ class FfmpegMuxer(Muxer):
                 raise RuntimeError(f"FFmpeg stream remuxing failed: {e}")
                 
             if rc != 0:
-                stderr_data = process.stderr.read().decode()
-                raise RuntimeError(f"FFmpeg stream remuxing failed (exit {rc}): {stderr_data}")
+                raise RuntimeError(f"FFmpeg stream remuxing failed (exit {rc}). See FFmpeg logs above.")
