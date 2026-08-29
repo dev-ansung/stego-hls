@@ -73,7 +73,14 @@ class HlsClipper:
             raise ValueError("No media segments found overlapping the target clipping range.")
 
         first_seg_start = overlapping[0].start_time
-        relative_start = start_sec - first_seg_start
+        
+        # In copy mode, align start to the segment boundary keyframe to prevent frozen frames
+        is_transcoding = getattr(self.muxer, "transcode", False)
+        if is_transcoding:
+            relative_start = start_sec - first_seg_start
+        else:
+            relative_start = 0.0
+            
         relative_end = end_sec - first_seg_start
 
         # 5. Download segment buffers

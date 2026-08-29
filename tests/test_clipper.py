@@ -7,7 +7,8 @@ type DecodedPayloads = dict[int, bytes]
 
 
 class MockMuxer:
-    def __init__(self) -> None:
+    def __init__(self, *, transcode: bool = False) -> None:
+        self.transcode = transcode
         self.called = False
         self.relative_start = 0.0
         self.relative_end = 0.0
@@ -54,7 +55,7 @@ def test_clipper_pipeline_execution(mock_client_class: MagicMock) -> None:
         1: b"segment_1_raw"
     }
     
-    mock_muxer = MockMuxer()
+    mock_muxer = MockMuxer(transcode=False)
     mock_decoder = MockDecoder()
 
     # Act: Instantiate Clipper and run clipping
@@ -73,7 +74,49 @@ def test_clipper_pipeline_execution(mock_client_class: MagicMock) -> None:
 
     # Assertions
     assert mock_muxer.called is True
-    # Start: 2.0. Segment 0 starts at 0.0. Relative start = 2.0 - 0.0 = 2.0
-    assert mock_muxer.relative_start == 2.0
+    # Copy mode: aligned to segment start (0.0)
+    assert mock_muxer.relative_start == 0.0
     assert mock_muxer.relative_end == 8.0
     assert mock_muxer.payloads == {0: b"segment_0_raw", 1: b"segment_1_raw"}
+
+
+@patch("httpx.Client")
+def test_clipper_pipeline_execution_transcode(mock_client_class: MagicMock) -> None:
+    mock_client = MagicMock()
+    mock_client_class.return_value.__enter__.return_value = mock_client
+    
+    mock_response = MagicMock()
+    mock_response.text = """
+#EXTM3U
+#EXT-X-VERSION:3
+#EXTINF:5.000,
+0.ts
+#EXTINF:5.000,
+1.ts
+    """
+    mock_client.get.return_value = mock_response
+
+    mock_downloader = MagicMock()
+    mock_downloader.download.return_value = {
+        0: b"segment_0_raw",
+        1: b"segment_1_raw"
+    }
+    
+    mock_muxer = MockMuxer(transcode=True)
+    mock_decoder = MockDecoder()
+
+    clipper = HlsClipper(
+        downloader=mock_downloader,
+        decoder=mock_decoder,
+        muxer=mock_muxer
+    )
+    
+    clipper.clip(
+        "https://example.com/master.m3u8",
+        start="2.0",
+        end="8.0",
+        output_path="download/out.mp4"
+    )
+
+    # Transcode mode: exact start offset (2.0)
+    assert mock_muxer.relative_start == 2.0
