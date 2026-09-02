@@ -23,8 +23,8 @@ class StegoDecoder(BaseDecoder):
         sub_data = raw_bytes[search_start:]
         
         for offset in range(len(sub_data) - self.MPEG_TS_PACKET_SIZE * 2):
-            if (sub_data[offset] == self.SYNC_BYTE and 
-                sub_data[offset + self.MPEG_TS_PACKET_SIZE] == self.SYNC_BYTE and 
+            if (sub_data[offset] == self.SYNC_BYTE and
+                sub_data[offset + self.MPEG_TS_PACKET_SIZE] == self.SYNC_BYTE and
                 sub_data[offset + self.MPEG_TS_PACKET_SIZE * 2] == self.SYNC_BYTE):
                 return sub_data[offset:]
                 

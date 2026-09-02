@@ -108,8 +108,17 @@ def run_batch(tasks: list[dict], *, parallel: int, transcode: bool, no_align: bo
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="M3U8 Steganographic Downloader and Clipper CLI")
+    # Pre-process sub-command keywords if present
+    if len(sys.argv) > 1 and sys.argv[1] == "stream":
+        sys.argv.pop(1)
+        sys.argv.append("--stream")
+    elif len(sys.argv) > 1 and sys.argv[1] in ("interactive", "-i", "--interactive"):
+        sys.argv.pop(1)
+        sys.argv.append("-i")
+
+    parser = argparse.ArgumentParser(description="M3U8 Steganographic Downloader, Streamer and Clipper CLI")
     parser.add_argument("url", nargs="?", help="HLS M3U8 manifest URL or HTML player page URL.")
+    parser.add_argument("-i", "--interactive", action="store_true", help="Launch interactive guided prompt.")
     parser.add_argument("-t", "--time", action="append", help="Target timing range (e.g. 08:00-12:00 or 2:18:00). Can be specified multiple times.")
     parser.add_argument("-r", "--referer", help="Optional Referer URL header required by CDN.")
     parser.add_argument("-o", "--output", help="Destination file path or prefix.")
@@ -119,8 +128,42 @@ def main() -> None:
     parser.add_argument("--srt", help="Optional path to a .srt subtitle file to embed or burn in.")
     parser.add_argument("--keep-cache", action="store_true", help="Retain downloaded segments cache folder after successful run.")
     parser.add_argument("-j", "--parallel", type=int, default=8, help="Number of concurrent segment downloads.")
+    parser.add_argument("--stream", action="store_true", help="Launch live streaming web player with subtitle support in browser.")
+    parser.add_argument("--port", type=int, default=8000, help="Port for the streaming proxy server (default: 8000).")
+    parser.add_argument("--no-browser", action="store_true", help="Do not automatically open the web browser.")
     
     args = parser.parse_args()
+    
+    # Interactive Wizard Mode
+    if args.interactive or (not args.url and not args.batch and sys.stdin.isatty()):
+        from stego_hls.wizard import run_interactive
+        run_interactive()
+        return
+    
+    # Stream Mode
+    if args.stream:
+        if not args.url:
+            print("Error: An M3U8 streaming URL is required for stream mode.", file=sys.stderr)
+            sys.exit(1)
+            
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        if args.referer:
+            referer = args.referer
+            if not referer.startswith("http://") and not referer.startswith("https://"):
+                referer = f"https://{referer}"
+            headers["Referer"] = referer
+            
+        from stego_hls.server import HlsProxyServer
+        proxy = HlsProxyServer(
+            args.url,
+            headers=headers,
+            srt_path=args.srt,
+            port=args.port
+        )
+        proxy.serve_forever(open_browser=not args.no_browser)
+        return
     
     # Batch JSON Processing
     if args.batch:

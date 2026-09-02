@@ -2,7 +2,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from stego_hls.cli import parse_timestamp, run_batch
 
 

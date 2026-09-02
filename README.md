@@ -35,8 +35,36 @@ uv run m3u8_downloader.py <URL> [OPTIONS]
 
 ## CLI Usage
 
-### Direct Command Options
+### Interactive Wizard (Recommended)
+Simply run `stego-hls` with no arguments (or `stego-hls -i`) to launch the guided assistant:
+```bash
+stego-hls
+```
+It will prompt you for:
+1. **Stream URL / M3U8:** (e.g. manifest or video player page URL)
+2. **Referer:** (Optional, auto-suggests based on URL)
+3. **Subtitles:** (Optional `.srt` file path with drag & drop support)
+4. **Action:** Live Stream in Web Browser (Video.js), Live Stream in Desktop Player (IINA), or Download / Clip Range to MP4.
+
+---
+
+### Live Streaming Mode (`stream`)
+Stream steganographic HLS videos directly to your browser or desktop media player with instant seeking and synchronized subtitle support without pre-downloading:
+```bash
+# 1. Open Video.js Web Player in browser
+stego-hls stream <URL> --referer supjav.com --srt subtitles.srt
+
+# 2. Open Raw HLS stream in desktop players (IINA / VLC)
+# Stream endpoint: http://localhost:8000/stream.m3u8
+/Applications/IINA.app/Contents/MacOS/iina-cli "http://localhost:8000/stream.m3u8" --mpv-sub-files="subtitles.srt"
+```
+
+---
+
+### Direct Download & Clip Options
 *   `URL` (Positional): The HLS manifest M3U8 link or HTML player page.
+*   `-i, --interactive`: Launch interactive guided prompt.
+*   `--stream`: Launch live streaming proxy server with Video.js web player.
 *   `-t, --time <RANGE>`: Target timing range (e.g., `08:00-12:00` or `2:18:00`). Can be specified multiple times to extract multiple clips.
 *   `-r, --referer <URL>`: Optional Referer header required by the CDN.
 *   `-o, --output <PATH>`: Destination filename or prefix. If multiple time ranges are given, this acts as the prefix/folder.
@@ -48,11 +76,15 @@ uv run m3u8_downloader.py <URL> [OPTIONS]
 *   `--keep-cache`: Retain downloaded segment cache folder (`.stego_cache/<hash>/`) on successful completion (by default, it is cleared to save disk space).
 
 ### Direct Examples
-1. Download a single clip:
+1. Stream live in web browser with subtitles:
+   ```bash
+   stego-hls stream https://example-cdn.com/playlist.m3u8 --referer https://example.com/ --srt subs.srt
+   ```
+2. Download a single clip:
    ```bash
    stego-hls https://example-cdn.com/playlist.m3u8 -t 08:00-12:00 --referer https://example.com/ -o clip.mp4
    ```
-2. Extract multiple clips from the same stream:
+3. Extract multiple clips from the same stream:
    ```bash
    stego-hls https://example-cdn.com/playlist.m3u8 -t 01:00-02:00 -t 05:00-06:00 -o my_video
    ```

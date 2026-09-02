@@ -1,5 +1,4 @@
 import pytest
-
 from stego_hls.decoders import PassthroughDecoder, StegoDecoder
 
 

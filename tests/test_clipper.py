@@ -19,11 +19,11 @@ class MockMuxer:
     def requires_keyframe_alignment(self) -> bool:
         return not self.transcode
 
-    def concatenate_and_clip(self, 
-                             payloads: DecodedPayloads, 
-                             *, 
-                             relative_start: float, 
-                             relative_end: float, 
+    def concatenate_and_clip(self,
+                             payloads: DecodedPayloads,
+                             *,
+                             relative_start: float,
+                             relative_end: float,
                              output_path: str,
                              srt_path: str | None = None) -> None:
         self.called = True

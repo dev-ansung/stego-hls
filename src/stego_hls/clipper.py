@@ -16,8 +16,8 @@ type DecodedPayloads = dict[int, bytes]
 
 
 class HlsClipper:
-    def __init__(self, 
-                 *, 
+    def __init__(self,
+                 *,
                  downloader: ParallelDownloader | None = None,
                  decoder: BaseDecoder | None = None,
                  muxer: Muxer | None = None,
@@ -27,11 +27,11 @@ class HlsClipper:
         self.decoder = decoder or StegoDecoder()
         self.muxer = muxer or FfmpegMuxer()
 
-    def clip(self, 
-             master_url: str, 
-             *, 
-             start: str, 
-             end: str, 
+    def clip(self,
+             master_url: str,
+             *,
+             start: str,
+             end: str,
              output_prefix: str | Path,
              headers: dict[str, str] | None = None,
              align_bounds: bool = True,
@@ -127,9 +127,9 @@ class HlsClipper:
 
             # 7. Stream directly into Muxer stdin
             self.muxer.concatenate_and_clip(
-                decoded_payloads, 
-                relative_start=relative_start, 
-                relative_end=relative_end, 
+                decoded_payloads,
+                relative_start=relative_start,
+                relative_end=relative_end,
                 output_path=str(output_path),
                 srt_path=str(temp_srt_path) if temp_srt_path else None
             )

@@ -87,3 +87,28 @@ def process_srt_file(input_path: str | Path, start_sec: float, end_sec: float, o
     
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(shifted_content)
+
+
+def srt_to_vtt(content: str) -> str:
+    """Converts standard SRT subtitle text into WebVTT format."""
+    content = content.replace("\r\n", "\n").strip()
+    if not content:
+        return "WEBVTT\n\n"
+        
+    blocks = content.split("\n\n")
+    vtt_blocks = []
+    
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if not lines:
+            continue
+        vtt_lines = []
+        for line in lines:
+            if "-->" in line:
+                vtt_lines.append(line.replace(",", "."))
+            else:
+                vtt_lines.append(line)
+        vtt_blocks.append("\n".join(vtt_lines))
+        
+    return "WEBVTT\n\n" + "\n\n".join(vtt_blocks) + "\n"
+

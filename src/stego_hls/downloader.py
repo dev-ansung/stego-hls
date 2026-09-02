@@ -12,9 +12,9 @@ type ProgressCallback = Callable[[int, int], None]
 
 
 class ParallelDownloader:
-    def __init__(self, 
-                 *, 
-                 workers: int = 8, 
+    def __init__(self,
+                 *,
+                 workers: int = 8,
                  client: httpx.Client | None = None,
                  cache: SegmentCache | None = None,
                  max_retries: int = 3,
@@ -25,11 +25,11 @@ class ParallelDownloader:
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
 
-    def download(self, 
-                 segments: list[Segment], 
-                 headers: dict[str, str], 
+    def download(self,
+                 segments: list[Segment],
+                 headers: dict[str, str],
                  stream_hash: str,
-                 *, 
+                 *,
                  progress_cb: ProgressCallback | None = None) -> dict[int, bytes]:
         """Downloads segment bytes concurrently using the configured HTTP client."""
         raw_payloads: dict[int, bytes] = {}

@@ -2,7 +2,6 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-
 from stego_hls.downloader import ParallelDownloader
 from stego_hls.playlist import Segment
 
