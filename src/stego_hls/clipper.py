@@ -152,6 +152,8 @@ class HlsClipper:
             
         start_str = self._format_duration_suffix(start_sec)
         if end_original in (None, "99999999.0", "99999999"):
+            if start_sec == 0.0:
+                return Path(f"{prefix}.mp4")
             suffix = start_str
         else:
             end_str = self._format_duration_suffix(end_sec)

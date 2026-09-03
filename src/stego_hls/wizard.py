@@ -97,15 +97,22 @@ def run_interactive() -> None:
             proxy.serve_forever(open_browser=True)
 
     elif choice == "3":
-        time_range = prompt_input("Enter Time Range (e.g. 08:00-12:00 or 1:30:00-1:45:00)", required=True)
-        out_prefix = prompt_input("Enter Output Filename or Prefix", default="download_clip")
+        import urllib.parse
+
+        time_range = prompt_input("4. Enter Time Range (e.g. 08:00-12:00, or press Enter for FULL video)", default=None)
+
+        parsed_u = urllib.parse.urlparse(url)
+        base_name = os.path.basename(parsed_u.path.strip("/"))
+        default_out = os.path.splitext(base_name)[0] or "downloaded_video"
+        out_prefix = prompt_input("5. Enter Output Filename or Prefix", default=default_out)
+
         from stego_hls.cli import run_batch
 
         task = {
             "url": url,
             "referer": referer,
             "output": out_prefix,
-            "time": time_range,
+            "time": time_range if time_range else None,
             "srt": srt
         }
         run_batch([task], parallel=8, transcode=False, no_align=False, srt=srt)
